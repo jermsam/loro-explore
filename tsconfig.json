@@ -1,0 +1,4 @@
+// loro-explore/tsconfig.json
+{
+  "extends": "./tsconfig.base.json"
+}
