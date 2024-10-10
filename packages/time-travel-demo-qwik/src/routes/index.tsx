@@ -50,7 +50,7 @@ export default component$(() => {
     checkout(v[0]);
   });
   return (
-    <div class={'p-5 max-w-screen-lg mx-auto'}>
+    <div class={'p-5 max-w-screen-xl mx-auto'}>
       <h1 class={'text-red-700'}>{greeting}</h1>
       <Separator orientation="horizontal" class="separator-top h-1 bg-red-700 w-full"/>
       <div class={'w-[calc(100% - 32)] p-4'} ref={view}>
@@ -71,10 +71,30 @@ export default component$(() => {
         <span>Text length: {text.value.length}</span>
       </div>
       <div class={'relative mt-0 transform scale-105'} style={'transform-origin: 0 0'}>
-        <div class="w-full whitespace-pre-wrap scale-[0.8] origin-top-left absolute top-0 left-0" >
+        <div
+          style={{
+            width: "100%",
+            whiteSpace: "pre-wrap",
+            transform: "scale(0.8)",
+            transformOrigin: "0 0",
+            position: "absolute",
+            top: 0,
+            left: 0,
+          }}
+        >
           {text.value}
         </div>
-        <div class="w-full whitespace-pre-wrap scale-[0.025] translate-x-[3600%] origin-top-left absolute top-0 left-0">
+        <div
+          style={{
+            width: "100%",
+            whiteSpace: "pre-wrap",
+            transform: "scale(0.025) translateX(3600%)",
+            transformOrigin: "0 0",
+            position: "absolute",
+            top: 0,
+            left: 0,
+          }}
+        >
           {text.value}
         </div>
       </div>
