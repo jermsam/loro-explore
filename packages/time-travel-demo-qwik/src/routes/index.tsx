@@ -1,4 +1,4 @@
-import {$, component$, noSerialize, NoSerialize, useOnDocument, useSignal, useTask$} from '@builder.io/qwik';
+import {$, component$, noSerialize, NoSerialize, useOnDocument, useSignal} from '@builder.io/qwik';
 import type {DocumentHead} from '@builder.io/qwik-city';
 import {sayHi} from '@loro-explore/shared';
 import {Separator} from '@qwik-ui/headless';
