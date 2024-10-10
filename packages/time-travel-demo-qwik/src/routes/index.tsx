@@ -58,7 +58,6 @@ export default component$(() => {
           value={[version.value]}
           max={maxVersion.value}
           min={-1}
-          step={0.0001}
           onValueChange={handleValueChange}
         />
         <div class={'flex justify-between mt-2'}>
