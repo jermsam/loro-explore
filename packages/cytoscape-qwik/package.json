@@ -1,6 +1,6 @@
 {
-  "name": "@loro-explore/time-travel-demo-qwik",
-  "description": "https://loro-dev.github.io/loro-time-travel-demo/ with qwik excluding @radix-ui/themes",
+  "name": "@loro-explore/cytoscape-qwik",
+  "description": "https://loro-react-flow-example-git-main-zxch3n.vercel.app/ but with cytoscape and Qwik",
   "engines": {
     "node": "^18.17.0 || ^20.3.0 || >=21.0.0"
   },
@@ -26,10 +26,12 @@
     "start": "vite --open --mode ssr",
     "qwik": "qwik"
   },
-
+  "devDependencies": {
+  },
   "dependencies": {
     "@loro-explore/shared": "workspace:^",
     "loro-crdt": "1.0.0-alpha.3",
-    "throttle-debounce": "^5.0.2"
+    "throttle-debounce": "^5.0.2",
+    "cytoscape": "^3.30.2"
   }
 }

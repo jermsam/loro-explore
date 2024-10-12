@@ -7,6 +7,9 @@ interface SliderProps {
   step?: number;  // Optional step size
   onValueChange?: QRL<(value: number[]) => void>;
   className?: string;
+  sliderTrackActiveColor?: string;
+  sliderTrackInActiveColor?: string;
+  sliderThumbColor?: string;
 }
 
 export const Slider = component$((props: SliderProps) => {
@@ -57,15 +60,18 @@ export const Slider = component$((props: SliderProps) => {
     <div class={['relative w-full', props.className].join(' ')}>
       <div
         class="h-2 bg-gray-300 rounded-full relative cursor-pointer"
+        style={{
+          background: props.sliderTrackInActiveColor
+        }}
         ref={trackRef}
         onClick$={moveToClickPosition}
       >
-        <div class="h-2 bg-indigo-600 rounded-full" style={{ width: `${((value.value - props.min) / (props.max - props.min)) * 100}%` }}></div>
+        <div class="h-2 bg-indigo-600 rounded-full" style={{ width: `${((value.value - props.min) / (props.max - props.min)) * 100}%`, background: props.sliderTrackActiveColor }}></div>
         {props.value.map((_, index) => (
           <div
             key={index}
             class="w-5 h-5 bg-indigo-600 rounded-full absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing"
-            style={{ left: `${((value.value - props.min) / (props.max - props.min)) * 100}%` }}
+            style={{ left: `${((value.value - props.min) / (props.max - props.min)) * 100}%`, background: props.sliderThumbColor }}
             onMouseDown$={() => isDragging.value = true}
             onTouchStart$={() => isDragging.value = true}
           ></div>

@@ -1,108 +1,116 @@
-import {$, component$, noSerialize, NoSerialize, useOnDocument, useSignal} from '@builder.io/qwik';
+import {$, component$, noSerialize, NoSerialize, useOnDocument, useSignal, useTask$} from '@builder.io/qwik';
 import type {DocumentHead} from '@builder.io/qwik-city';
-import {sayHi} from '@loro-explore/shared';
-import {Separator} from '@qwik-ui/headless';
+import {sayHi} from '@loro-explore/shared/utils';
+import {GreetLayout} from '@loro-explore/shared/layouts';
+import {LoroDoc, OpId} from 'loro-crdt';
+import {AkarIconsGithubOutlineFill} from '@loro-explore/shared/icons';
 // @ts-ignore
-import jsonUpdates from "/seph-blog-updates.json?url&raw";
-import { LoroDoc, OpId} from 'loro-crdt';
+import jsonUpdates from '/seph-blog-updates.json?url&raw';
 import {Slider} from '~/components/slider';
-import { throttle } from 'throttle-debounce';
+import {throttle} from 'throttle-debounce';
+import {isServer} from '@builder.io/qwik/build';
 
 export default component$(() => {
   const greeting = useSignal<string>('');
   const loro = useSignal<NoSerialize<LoroDoc>>();
-  const lastId = useSignal<undefined | OpId>();
-  const version = useSignal<number>(-1)
-  const maxVersion = useSignal<number>(0)
-  const checkoutTime = useSignal<number>(0)
-  const text = useSignal<string>('');
   const view = useSignal<HTMLDivElement>();
- 
+  const lastId = useSignal<undefined | OpId>();
+  const version = useSignal<number>(-1);
+  const maxVersion = useSignal<number>(0);
+  const checkoutTime = useSignal<number>(0);
+  const text = useSignal<string>('');
   
-  useOnDocument('DOMContentLoaded', $(()=>{
-    loro.value = noSerialize(new LoroDoc())
-    if(!loro.value) return
-    greeting.value = sayHi('Loro!');
+  useTask$(({track, cleanup})=>{
+    if(isServer || !view.value) return
+    track(()=> view.value)
+    view.value.scrollTop = view.value.scrollHeight;
+    cleanup(()=>{
+      view.value = undefined
+    })
+  })
+  
+  useOnDocument('DOMContentLoaded', $(() => {
+    loro.value = noSerialize(new LoroDoc());
+    if (!loro.value) return;
+    greeting.value = sayHi('Loro Time-Travel!');
+    console.log(jsonUpdates);
     loro.value.importJsonUpdates(jsonUpdates);
-    lastId.value =loro.value.frontiers()[0];
-    maxVersion.value = lastId.value.counter
+    lastId.value = loro.value.frontiers()[0];
+    maxVersion.value = lastId.value.counter;
     loro.value.checkout([]);
     text.value = '';
-  }))
+  }));
   
   const handleValueChange = $((v: number[]) => {
-    const checkout = throttle(100, (ver: number) => {
-      if(loro.value) {
-        const start = performance.now()
-        if (ver === -1) {
+    const checkout = throttle(100, (counter: number) => {
+      if (loro.value) {
+        const start = performance.now();
+        if (counter === -1) {
           loro.value.checkout([]);
         } else {
           loro.value.checkout([{
-            peer: lastId.value?.peer  as any,
-            counter: ver,
+            peer: lastId.value?.peer as any,
+            counter,
           }]);
         }
         checkoutTime.value = (performance.now() - start);
-        text.value = loro.value.getText("text").toString();
+        text.value = loro.value.getText('text').toString();
       }
     });
     version.value = v[0];
     checkout(v[0]);
   });
+  
   return (
-    <div class={'p-5 max-w-screen-xl mx-auto'}>
-      <h1 class={'text-red-700'}>{greeting}</h1>
-      <Separator orientation="horizontal" class="separator-top h-1 bg-red-700 w-full"/>
-      <div class={'w-[calc(100% - 32)] p-4'} ref={view}>
-        <Slider
-          value={[version.value]}
-          max={maxVersion.value}
-          min={-1}
-          onValueChange={handleValueChange}
-        />
-        <div class={'flex justify-between mt-2'}>
-          <span>Current Version {version.value}</span>{' '}
-          <span>Max Version {maxVersion.value}</span>
-        </div>
+    <GreetLayout greeting={greeting.value}>
+      <div q:slot={'header'} class={'flex'}>
+        <a href="https://github.com/jermsam/loro-explore/tree/main/packages/time-travel-demo-qwik/src/routes/index.tsx"
+           target="_blank">
+          <AkarIconsGithubOutlineFill class={'cursor-pointer text-2xl'}/>
+        </a>
       </div>
-      <div class={'flex justify-between mt-2'}>
-        <span style={{marginRight: "2em"}}>Checkout duration: {checkoutTime.value.toFixed(2)} ms</span>
+      <div class={'flex justify-between mt-2 w-full'}>
+        <span style={{}}>Current Version {version}</span>{' '}
+        <span style={{}}>Max Version {maxVersion}</span>
+      </div>
+      <div class={'flex justify-between '} style={{fontFamily: 'monospace'}}>
+        <span style={{marginRight: '2em'}}>Checkout duration: {checkoutTime.value.toFixed(2)} ms</span>
         <span>Text length: {text.value.length}</span>
       </div>
-      <div class={'relative mt-0 transform scale-105'} style={'transform-origin: 0 0'}>
-        <div
-          style={{
-            width: "100%",
-            whiteSpace: "pre-wrap",
-            transform: "scale(0.8)",
-            transformOrigin: "0 0",
-            position: "absolute",
-            top: 0,
-            left: 0,
-          }}
-        >
-          {text.value}
-        </div>
-        <div
-          style={{
-            width: "100%",
-            whiteSpace: "pre-wrap",
-            transform: "scale(0.025) translateX(3600%)",
-            transformOrigin: "0 0",
-            position: "absolute",
-            top: 0,
-            left: 0,
-          }}
-        >
-          {text.value}
+      <Slider
+        value={[version.value]}
+        max={maxVersion.value}
+        min={-1}
+        onValueChange={handleValueChange}
+        sliderThumbColor={'brown'}
+        sliderTrackActiveColor={'brown'}
+      />
+      <div class="w-full p-5 h-5/6 border bg-amber-50 border-gray-300 rounded-b-lg shadow-md overflow-y-auto"
+           ref={view}>
+        <div class="relative mt-2 transform scale-[1.0] origin-top-left">
+          <div
+            class="w-full break-words text-wrap text-[11px] whitespace-pre-wrap transform scale-[0.8] origin-top-left absolute top-0 left-0"
+          >
+            {text.value}
+          </div>
+          <div
+            class={'w-full break-words whitespace-pre-wrap origin-top-left absolute top-0 left-0 transform scale-[0.1] translate-x-[84%]'}
+          >
+            {text.value}
+          </div>
+          <div
+            class={'w-full break-words whitespace-pre-wrap origin-top-left absolute top-0 left-0 transform scale-[0.05] translate-x-[95%]'}
+          >
+            {text.value}
+          </div>
         </div>
       </div>
-    </div>
+    </GreetLayout>
   );
 });
 
 export const head: DocumentHead = {
-  title: 'Welcome to Qwik',
+  title: 'Loro | Time-Travel Qwik',
   meta: [
     {
       name: 'description',

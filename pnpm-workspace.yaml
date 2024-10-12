@@ -1,2 +1,4 @@
 packages:
   - "./packages/**"
+public-hoist-pattern:
+  - "@types/*"
