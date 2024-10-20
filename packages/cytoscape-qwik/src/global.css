@@ -13,3 +13,15 @@
 [data-qwik-cls]::after {
   content: none ! important;
 }
+
+@layer utilities {
+  .bg-dotted-grid {
+    position: relative;
+    background-color: transparent; /* Base background color */
+    background-image:
+        radial-gradient(circle, rgba(0, 0, 0, 0.2) 1px, transparent 1px),
+        radial-gradient(circle, rgba(0, 0, 0, 0.2) 1px, transparent 1px);
+    background-size: 20px 20px; /* Smaller initial grid size */
+    background-position: 0 0;
+  }
+}

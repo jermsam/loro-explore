@@ -6,7 +6,7 @@ import {LoroDoc, OpId} from 'loro-crdt';
 import {AkarIconsGithubOutlineFill} from '@loro-explore/shared/icons';
 // @ts-ignore
 import jsonUpdates from '/seph-blog-updates.json?url&raw';
-import {Slider} from '~/components/slider';
+import {Slider} from '@loro-explore/shared/components';
 import {throttle} from 'throttle-debounce';
 import {isServer} from '@builder.io/qwik/build';
 

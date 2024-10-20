@@ -4,6 +4,7 @@ export default {
     './src/**/*.{js,ts,jsx,tsx,mdx}',
     '../../packages/shared/**/*.{js,ts,jsx,tsx}',
   ],
+  darkMode: 'class', // or 'media' for media-query based
   theme: {
     extend: {},
   },
