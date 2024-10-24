@@ -2,16 +2,14 @@ import {
   $,
   component$,
   noSerialize,
-  NoSerialize,
-  useContext,
-  useOnDocument,
+  NoSerialize, useComputed$,
+  useContext, useOnDocument,
   useSignal,
   useTask$,
 } from '@builder.io/qwik';
 import {DocumentHead, server$} from '@builder.io/qwik-city';
-import {sayHi} from '@loro-explore/shared/utils';
 import {GreetLayout} from '@loro-explore/shared/layouts';
-import {LoroDoc, LoroMap, VersionVector} from 'loro-crdt';
+import {ContainerID, LoroDoc, LoroList, LoroMap, OpId, VersionVector} from 'loro-crdt';
 import {
   AkarIconsGithubOutlineFill,
   HugeiconsWifiConnected02,
@@ -20,11 +18,27 @@ import {
 import {nodes as initialNodes, edges as initialEdges} from '~/utils/nodes-edges';
 
 import {EdgeDefinition, NodeDefinition} from 'cytoscape';
-import LoroCytoscapeComponent from '~/components/loro-cytoscape-component';
 import {DarkModeContext} from '~/routes/layout';
-import {LightDarkMode, Switch} from '@loro-explore/shared/components';
+import {LightDarkMode, Slider, Switch} from '@loro-explore/shared/components';
+import CytoscapeComponent from '~/components/cytoscape-component';
+import {sayHi} from '@loro-explore/shared/utils';
 
+// Create a JSON structure of
 export const initOriginDoc = server$(() => {
+  
+  // const node = {
+  //   position: {x: 0, y: 9},
+  //   data: {id: '1', label: 'A'},
+  // }
+  //
+  // const edge =  {
+  //   data: {id: 'e1-2', source: '1', target: '2'},
+  // }
+  // const elements = {
+  //   nodes: [],
+  //   edges: []
+  // }
+  
   const originDoc = new LoroDoc();
   originDoc.setPeerId(0n);
   const loroNodes = originDoc.getList('nodes');
@@ -43,6 +57,7 @@ export const initOriginDoc = server$(() => {
     data.set('id', id);
     data.set('label', label);
   }
+  
   for (let i = 0; i < initialEdges.length; i++) {
     const edgeItem = initialEdges[i];
     const edge = loroEdges.insertContainer(i, new LoroMap());
@@ -54,10 +69,256 @@ export const initOriginDoc = server$(() => {
     data.set('source', source);
     data.set('target', target);
   }
+  
   originDoc.commit();
   return originDoc;
 });
 
+export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: NoSerialize<LoroList>, edges: NoSerialize<EdgeDefinition[]>) => {
+  if (!loroEdges || loroEdges.length === edges?.length) return;
+  let changed = false;
+  const curEdges: EdgeDefinition[] = loroEdges.toJSON();
+  let del = 0;
+  for (let i = 0; i < curEdges.length; i++) {
+    const edge = curEdges[i];
+    
+    if (edges?.find(e => e.data.id === edge.data.id) == null) {
+      changed = true;
+      loroEdges.delete(i - del, 1);
+      del += 1;
+    }
+  }
+  
+  for (const edge of edges || []) {
+    if (curEdges.find(e => e.data.id === edge.data.id) == null) {
+      // insert new edge
+      const map = loroEdges.insertContainer(0, new LoroMap());
+      const data = map.setContainer('data', new LoroMap());
+      data.set('id', edge.data.id);
+      data.set('source', edge.data.source);
+      data.set('target', edge.data.target);
+      changed = true;
+    }
+  }
+  
+  if (changed) {
+    doc?.commit();
+  }
+});
+
+export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: NoSerialize<LoroList>, nodes: NoSerialize<NodeDefinition[]>) => {
+  if (!loroNodes) return;
+  const n = loroNodes.length;
+  
+  let del = 0;
+  let changed = false;
+  for (let i = 0; i + del < n; i++) {
+    
+    const node = loroNodes.get(i - del) as LoroMap;
+    const nodeId = node.id;
+    
+    const map = doc?.getMap(nodeId) as LoroMap<Record<string, unknown>>;
+    const id = map.get('id') as string;
+    
+    const source = nodes?.find(n => n.data.id === id);
+    if (source == null) {
+      loroNodes.delete(i, 1);
+      changed = true;
+      del += 1;
+      continue;
+    }
+    
+    const value: NodeDefinition = map.toJSON();
+    const posId = map.get('position');
+    const pos = doc?.getMap(posId as ContainerID);
+    const valueX = value.position?.x || 0;
+    const sourceX = source.position?.x;
+    const valueY = value.position?.y;
+    const sourceY = source.position?.y;
+    if (valueX !== sourceX || valueY !== sourceY) {
+      changed = true;
+      pos?.set('x', sourceX);
+      pos?.set('y', sourceY);
+    }
+  }
+  
+  if (changed) {
+    doc?.commit();
+  }
+});
+
+export interface LoroCytoscape {
+  doc: NoSerialize<LoroDoc>;
+  nodes: NodeDefinition[];
+  edges: EdgeDefinition[];
+}
+
+
+const Flow = component$<LoroCytoscape>((props) => {
+  
+  const doc = useSignal<NoSerialize<LoroDoc>>(props.doc);
+  const v = useSignal<number>(0);
+  const maxV = useSignal<number>(0);
+  // version vectors
+  const vv = useSignal<string | undefined>();
+  // valid frontiers
+  const vf = useSignal<OpId[][]>([]);
+  
+  const nodes = useSignal<NoSerialize<NodeDefinition[]>>(noSerialize([]));
+  const edges = useSignal<NoSerialize<EdgeDefinition[]>>(noSerialize([]));
+  
+  useOnDocument('DOMContentLoaded', $(() => {
+    nodes.value = noSerialize(initialNodes);
+    edges.value = noSerialize(initialEdges);
+  }));
+  
+  useTask$(() => {
+    if (!doc.value) return;
+    vv.value = JSON.stringify(Object.fromEntries(doc.value.version().toJSON()));
+    if (vf.value.length === 0) {
+      const opIds = doc.value.frontiers() as OpId[];
+      vf.value.push(opIds);
+    }
+  });
+  
+  
+  useTask$(({track, cleanup}) => {
+    track(() => doc.value);
+    if (!doc.value) return;
+    const docNodes = doc.value.getList('nodes').toJSON();
+    nodes.value = noSerialize(docNodes);
+    const docEdges = doc.value.getList('edges').toJSON();
+    edges.value = noSerialize(docEdges);
+    const lastVV: Map<`${number}`, number> = doc.value.version().toJSON();
+    
+    doc.value.subscribe(e => {
+      setTimeout(() => {
+        if (!doc.value) return;
+        const version = doc.value.version().toJSON();
+        vv.value = JSON.stringify(Object.fromEntries(version));
+        
+        if (e.by === 'checkout') return;
+        
+        const newVV = doc.value.version().toJSON();
+        let changed = false;
+        for (const [peer, counter] of newVV.entries()) {
+          const c = lastVV.get(peer) ?? 0;
+          if (c >= counter) {
+            continue;
+          }
+          
+          for (let i = c; i < counter; i++) {
+            vf.value.push([{peer, counter: i}]);
+            changed = true;
+          }
+          lastVV.set(peer, counter);
+        }
+        
+        if (e.by === 'local') {
+          nodes.value = noSerialize(doc.value.getList('nodes').toJSON());
+          edges.value = noSerialize(doc.value.getList('edges').toJSON());
+          if (changed) {
+            maxV.value = vf.value.length;
+            v.value = vf.value.length;
+          }
+        }
+      });
+    });
+    cleanup(() => {
+      if (!doc.value) return;
+      // doc.value.unsubscribe(subId);
+    });
+  });
+  
+  const eq = useComputed$(() => maxV.value == v.value);
+  
+  useTask$(async ({track}) => {
+    track(() => doc.value);
+    track(() => eq.value);
+    track(() => nodes.value);
+    if (!doc.value || !eq.value) return;
+    const nodeList = noSerialize(doc.value.getList('nodes') as LoroList<unknown>);
+    await onNodesUpdated(doc.value, nodeList, nodes.value);
+    maxV.value = vf.value.length;
+    v.value = vf.value.length;
+  });
+  
+  useTask$(async ({track}) => {
+    track(() => doc.value);
+    track(() => eq.value);
+    track(() => edges.value);
+    if (!doc.value || !eq.value) return;
+    const edgeList = noSerialize(doc.value.getList('edges') as LoroList<unknown>);
+    await onEdgesUpdated(doc.value, edgeList, edges.value);
+    maxV.value = vf.value.length;
+    v.value = vf.value.length;
+  });
+  
+  const onChangeVersion = $((version: number[]) => {
+    if (!doc.value) return;
+    const loroNodes = doc.value.getList('nodes') as LoroList<NodeDefinition[]>;
+    const loroEdges = doc.value.getList('edges') as LoroList<EdgeDefinition[]>;
+    const ver = Math.max(version[0], 1) - 1;
+    if (ver == vf.value.length - 1) {
+      doc.value.checkoutToLatest();
+    } else {
+      doc.value.checkout(vf.value[ver]);
+    }
+    nodes.value = noSerialize(loroNodes.toJSON());
+    edges.value = noSerialize(loroEdges.toJSON());
+    v.value = version[0];
+  });
+  
+  
+  const onNodesChange = $((ns: NodeDefinition[]) => {
+    nodes.value = noSerialize(ns);
+  });
+  const onEdgeChange = $((es: EdgeDefinition[]) => {
+    edges.value = noSerialize(es);
+  });
+  
+  return (
+    <div class={'w-full h-full'}
+         style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column'}}>
+      <div style={{
+        position: 'absolute',
+        fontSize: 18,
+        top: 10,
+        width: 360,
+        maxWidth: 'calc(100% - 48px)',
+        left: '50%',
+        zIndex: 2,
+        transform: 'translateX(-50%)',
+      }}>
+        <div style={{marginBottom: 8}}>
+          Version vector: {vv.value}
+        </div>
+        {
+          maxV.value > 0 ?
+            <Slider
+              value={[v.value]}
+              max={maxV.value}
+              min={0}
+              step={0.01}
+              onValueChange={onChangeVersion}
+            /> :
+            undefined
+        }
+      </div>
+      <div style={{flexGrow: 1}}>
+        <CytoscapeComponent
+          nodes={nodes.value}
+          edges={edges.value}
+          onNodesChange$={onNodesChange}
+          onEdgesChange$={onEdgeChange}
+          onConnect$={(params) => {
+            console.log({params});
+          }}
+        />
+      </div>
+    </div>
+  );
+});
 
 export default component$(() => {
   const darkMode = useContext(DarkModeContext);
@@ -67,59 +328,73 @@ export default component$(() => {
   const docA = useSignal<NoSerialize<LoroDoc>>();
   const docB = useSignal<NoSerialize<LoroDoc>>();
   
-  const cyNodes = useSignal<NoSerialize<NodeDefinition[]>>(noSerialize(initialNodes));
-  const cyEdges = useSignal<NoSerialize<EdgeDefinition[]>>(noSerialize(initialEdges));
-  
   useOnDocument('DOMContentLoaded', $(() => {
-    greeting.value = sayHi('Loro - Cytoscape!');
+    greeting.value = sayHi('Loro Cytoscape!');
   }));
   
-  useOnDocument('DOMContentLoaded', $(() => {
-    greeting.value = sayHi('Cytoscape!');
-  }));
-  
-  
+  // Initialize Loro instances and subscriptions
   useTask$(async () => {
-    docA.value = noSerialize(new LoroDoc());
-    docA.value?.setPeerId(1n);
-    docB.value = noSerialize(new LoroDoc());
-    docB.value?.setPeerId(2n);
-    const originalDoc = await initOriginDoc();
-    const snapshot = originalDoc.export({mode: 'snapshot'}) as Uint8Array;
+    const instanceA = new LoroDoc();
+    const instanceB = new LoroDoc();
+    instanceA.setPeerId(1n);
+    instanceB.setPeerId(2n);
+    const originDoc = await initOriginDoc();
+    // Import the origin doc snapshot
+    const shallowSnapshotBytes = originDoc.export({
+      mode: 'shallow-snapshot',
+      frontiers: originDoc.frontiers(),
+    });
+    // or you can use
+    // const snapshotBytes = doc.export({ mode: "snapshot" });
+    instanceA.import(shallowSnapshotBytes);
+    instanceB.import(shallowSnapshotBytes);
     
-    docA.value?.import(snapshot);
-    docB.value?.import(snapshot);
-    docA.value?.subscribe((e) => {
+    // Subscribe to docA changes
+    instanceA.subscribe((e) => {
+      if (!connectedRef.value) return;
+      setTimeout(() => {
+        if (e.by === 'local' && !instanceA.isDetached()) {
+          const instanceBVV = instanceB.version() as VersionVector;
+          const instanceBUint8Array = instanceA.export({mode: 'update', from: instanceBVV});
+          instanceB.import(instanceBUint8Array);
+        }
+      });
+    });
+    
+    // Subscribe to docB changes
+    instanceB.subscribe((e) => {
+      if (!connectedRef.value) return;
+      setTimeout(() => {
+        if (e.by === 'local' && !instanceB.isDetached()) {
+          const instanceAVV = instanceA.version();
+          const instanceAUint8Array = instanceB.export({mode: 'update', from: instanceAVV});
+          instanceA.import(instanceAUint8Array);
+        }
+      });
+    });
+    
+    // Assign instances to signals
+    docA.value = noSerialize(instanceA);
+    docB.value = noSerialize(instanceB);
+  });
+  
+  const onSwitchChange = $((v: boolean) => {
+    if (v && docA.value && docB.value) {
+      const docAVV = docA.value.version();
+      const docAUint8Array = docB.value.export({mode: 'update', from: docAVV});
+      docA.value.import(docAUint8Array);
       
-      if (!connectedRef.value) {
-        return;
-      }
-      setTimeout(() => {
-        if (e.by === 'local' && !docA.value?.isDetached()) {
-          const docBVersionVector = docB.value?.version() as VersionVector;
-          const docASnapshot = docA.value?.export({mode: 'update', start_vv: docBVersionVector}) as Uint8Array;
-          docB.value?.import(docASnapshot);
-        }
-      });
-    });
-    
-    docB.value?.subscribe((e) => {
-      if (!connectedRef.value) {
-        return;
-      }
-      setTimeout(() => {
-        if (e.by === 'local' && !docA.value?.isDetached()) {
-          const docAVersionVector = docA.value?.version() as VersionVector;
-          const docBVersion = docB.value?.export({mode: 'update', start_vv: docAVersionVector}) as Uint8Array;
-          docA.value?.import(docBVersion);
-        }
-      });
-    });
+      const docBVV = docB.value.version();
+      const docBUint8Array = docA.value.export({mode: 'update', from: docBVV});
+      docB.value.import(docBUint8Array);
+    }
+    connectedRef.value = v;
+    connected.value = v;
   });
   
   
   return (
-    <div class={'w-full bg-gray-50 dark:text-teal-50 dark:bg-[#212121]'}>
+    <div class={'w-full min-h-screen bg-gray-50 dark:text-teal-50 dark:bg-[#212121]'}>
       <GreetLayout greeting={greeting.value}>
         <div q:slot={'header'} class={'flex w-full items-center justify-between'}>
           <div class={'flex gap-10'}>
@@ -127,10 +402,11 @@ export default component$(() => {
               <Switch
                 color={'rgb(21 128 61 )'}
                 on={connected.value}
-                onChange$={(value) => connected.value = value}
+                onChange$={onSwitchChange}
               >
                 <span q:slot={'off'} class={'text-2xl'}>
-                  {connected.value ? <HugeiconsWifiConnected02 class={'text-green-700 dark:text-green-300'}/> : <HugeiconsWifiDisconnected02/>}
+                  {connected.value ? <HugeiconsWifiConnected02 class={'text-green-700 dark:text-green-300'}/> :
+                    <HugeiconsWifiDisconnected02/>}
                 </span>
               </Switch>
             </div>
@@ -145,7 +421,6 @@ export default component$(() => {
             onModeChange$={(mode) => darkMode.value = mode}
           />
         </div>
-        
         <div class={'w-full h-5/6 rounded-lg '}>
           <div class={'flex gap-1 justify-between w-full h-full'}>
             <div style={{
@@ -153,13 +428,12 @@ export default component$(() => {
             }}
                  class={'w-[50%] border bg-white dark:bg-[#181818] border-gray-300 rounded-lg shadow-md'}
             >
-              
-              <LoroCytoscapeComponent doc={docA.value} nodes={cyNodes.value} edges={cyEdges.value}/>
+              <Flow doc={docA.value} nodes={initialNodes} edges={initialEdges}/>
             </div>
             <div style={{flexGrow: 1}}
                  class={'w-[50%] border bg-white dark:bg-[#181818] border-gray-300 rounded-lg shadow-md'}
             >
-              <LoroCytoscapeComponent doc={docB.value} nodes={cyNodes.value} edges={cyEdges.value}/>
+              <Flow doc={docB.value} nodes={initialNodes} edges={initialEdges}/>
             </div>
           </div>
         </div>

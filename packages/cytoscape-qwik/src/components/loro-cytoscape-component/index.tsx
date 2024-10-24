@@ -16,7 +16,8 @@ export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: Lor
   let del = 0;
   let changed = false;
   for (let i = 0; i + del < n; i++) {
-    const nodeId = loroNodes.get(i - del);
+    const node = loroNodes.get(i - del) as LoroMap;
+    const nodeId = node.id;
     const map = doc?.getMap(nodeId as ContainerID) as LoroMap<Record<string, unknown>>;
     const id = map.get('id') as string;
     const source = nodes?.find(n => n.data.id === id);
@@ -82,7 +83,6 @@ export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: Lor
 });
 
 
-
 export default component$<LoroCytoscapeComponent>((props) => {
   const versionVector = useSignal<string>();
   const nodes = useSignal<NoSerialize<NodeDefinition[]>>(noSerialize([]));
@@ -92,16 +92,24 @@ export default component$<LoroCytoscapeComponent>((props) => {
   const maxVersion = useSignal<number>(0);
   
   useTask$(({track}) => {
-    track(()=>props.doc)
-    track(()=>props.nodes)
-    track(()=>props.edges)
-    // initialization
-    const doc = props.doc;
-    const docVersionVector = doc?.version() as VersionVector;
-    versionVector.value = JSON.stringify(Object.fromEntries(docVersionVector.toJSON()));
+    track(() => props.nodes);
+    track(() => props.edges);
+    // // initialization
     nodes.value = noSerialize(props.nodes);
     edges.value = noSerialize(props.edges);
+  });
+  
+  useTask$(({track}) => {
+    track(() => props.doc);
+    // // initialization
+    const doc = props.doc;
     
+    if(!doc) return
+    const docVersionVector = doc?.version() as VersionVector;
+   
+    versionVector.value = JSON.stringify(Object.fromEntries(docVersionVector.toJSON()));
+    
+    //
     if (validFrontiersRef.value.length === 0) {
       const opIds = doc?.frontiers() as OpId[];
       validFrontiersRef.value.push(opIds);
@@ -111,19 +119,23 @@ export default component$<LoroCytoscapeComponent>((props) => {
   useTask$(({track, cleanup}) => {
     track(() => props.doc);
     const doc = props.doc;
+    if(!doc) return
     const loroNodes = doc?.getList('nodes') as LoroList<NodeDefinition[]>;
     nodes.value = loroNodes.toJSON();
-   
+    
     const loroEdges = doc?.getList('edges') as LoroList<EdgeDefinition[]>;
     edges.value = loroEdges.toJSON();
+   
     const docVersionVector = doc?.version() as VersionVector;
     const lastVersionVector: Map<`${number}`, number> = docVersionVector.toJSON();
-    
+
     const subId = doc?.subscribe((e) => {
       setTimeout(() => {
-        
+
         let docVersionVector = doc.version();
         versionVector.value = JSON.stringify(Object.fromEntries(docVersionVector.toJSON()));
+        
+        console.log({vv: versionVector.value});
         if (e.by === 'checkout') {
           return;
         }
@@ -135,7 +147,7 @@ export default component$<LoroCytoscapeComponent>((props) => {
           if (c >= counter) {
             continue;
           }
-          
+
           for (let i = c; i < counter; i++) {
             validFrontiersRef.value.push([{peer, counter: i}]);
             changed = true;
@@ -154,7 +166,7 @@ export default component$<LoroCytoscapeComponent>((props) => {
         }
       });
     });
-    
+
     cleanup(() => {
       doc?.unsubscribe(subId as number);
     });
@@ -175,15 +187,16 @@ export default component$<LoroCytoscapeComponent>((props) => {
   //   version.value = v[0];
   // });
   
-  const eq = useComputed$(() => maxVersion == version);
+  const eq = useComputed$(() => maxVersion.value == version.value);
   
   useTask$(async ({track}) => {
     track(() => props.doc);
     track(() => nodes.value);
     track(() => eq.value);
-    if (!eq.value) return;
+    if (!eq.value || !props.doc) return;
     const doc = props.doc;
     const nodeList = doc?.getList('nodes') as LoroList<unknown>;
+    console.log({nodeList});
     await onNodesUpdated(doc, nodeList, nodes.value);
     maxVersion.value = validFrontiersRef.value.length;
     version.value = validFrontiersRef.value.length;
@@ -193,38 +206,35 @@ export default component$<LoroCytoscapeComponent>((props) => {
     track(() => props.doc);
     track(() => edges.value);
     track(() => eq.value);
-    if (!eq.value) return;
+    if (!eq.value || !props.doc) return;
     const doc = props.doc;
     const edgeList = doc?.getList('edges') as LoroList<unknown>;
+    console.log({edgeList});
     await onEdgesUpdated(doc, edgeList, edges.value);
     maxVersion.value = validFrontiersRef.value.length;
     version.value = validFrontiersRef.value.length;
   });
   
-  const onNodesChange = $((nodes: any) => {
-    nodes.value = nodes;
-    // console.log(nodes);
+  const onNodesChange = $((nds: any) => {
+    if(!eq.value) return
+    nodes.value = nds;
   });
-  const onEdgeChange = $((edges: any) => {
-    edges.value = edges;
-    // console.log(edges);
+  const onEdgeChange = $((eds: any) => {
+    if(!eq.value) return
+    edges.value = eds;
   });
   
   return (
-    <CytoscapeComponent
-      nodes={nodes.value}
-      edges={edges.value}
-      onNodesChange$={eq.value ? onNodesChange : $(() => {
-        // 00 -
-      })}
-      onEdgesChange$={eq.value ? onEdgeChange : $(() => {
-        // 01 -
-      })}
-      fitViewOptions={{
-        padding: 0.4,
-      }}
-      fitView
-    />
+      <CytoscapeComponent
+        nodes={nodes.value}
+        edges={edges.value}
+        onNodesChange$={onNodesChange}
+        onEdgesChange$={onEdgeChange}
+        fitViewOptions={{
+          padding: 0.4,
+        }}
+        fitView
+      />
   );
 });
 

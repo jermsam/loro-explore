@@ -26,10 +26,8 @@
     "start": "vite --open --mode ssr",
     "qwik": "qwik"
   },
-
   "dependencies": {
     "@loro-explore/shared": "workspace:^",
-    "loro-crdt": "1.0.0-alpha.3",
     "throttle-debounce": "^5.0.2"
   }
 }

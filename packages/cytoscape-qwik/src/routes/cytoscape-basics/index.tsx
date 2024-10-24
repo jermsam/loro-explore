@@ -1,4 +1,12 @@
-import {$, component$, noSerialize, NoSerialize, useContext, useOnDocument, useSignal} from '@builder.io/qwik';
+import {
+  $,
+  component$,
+  noSerialize,
+  NoSerialize,
+  useContext,
+  useOnDocument,
+  useSignal,
+} from '@builder.io/qwik';
 import type {DocumentHead} from '@builder.io/qwik-city';
 import {sayHi} from '@loro-explore/shared/utils';
 import {AkarIconsGithubOutlineFill} from '@loro-explore/shared/icons';
@@ -20,17 +28,20 @@ export default component$(() => {
     cyNodes.value = noSerialize(nodes);
     cyEdges.value = noSerialize(edges);
   }));
+ 
   
   const onNodesChange = $((nodes: any) => {
+    cyNodes.value = noSerialize(nodes)
     console.log({nodes});
   });
   const onEdgeChange = $((edges: any) => {
+    cyEdges.value = noSerialize(edges)
     console.log({edges});
   });
   
   
   return (
-   <div class={'w-full bg-gray-50 dark:text-teal-50 dark:bg-[#212121]'}>
+   <div class={'w-full min-h-screen  bg-gray-50 dark:text-teal-50 dark:bg-[#212121]'}>
      <GreetLayout
        greeting={greeting.value}
      >

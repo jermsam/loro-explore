@@ -66,11 +66,11 @@ export const Slider = component$((props: SliderProps) => {
         ref={trackRef}
         onClick$={moveToClickPosition}
       >
-        <div class="h-2 bg-indigo-600 rounded-full" style={{ width: `${((value.value - props.min) / (props.max - props.min)) * 100}%`, background: props.sliderTrackActiveColor }}></div>
+        <div class="h-2 bg-[#667744] rounded-full" style={{ width: `${((value.value - props.min) / (props.max - props.min)) * 100}%`, background: props.sliderTrackActiveColor }}></div>
         {props.value.map((_, index) => (
           <div
             key={index}
-            class="w-5 h-5 bg-indigo-600 rounded-full absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing"
+            class="w-5 h-5 bg-[#667744] rounded-full absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing"
             style={{ left: `${((value.value - props.min) / (props.max - props.min)) * 100}%`, background: props.sliderThumbColor }}
             onMouseDown$={() => isDragging.value = true}
             onTouchStart$={() => isDragging.value = true}

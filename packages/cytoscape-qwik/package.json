@@ -26,12 +26,9 @@
     "start": "vite --open --mode ssr",
     "qwik": "qwik"
   },
-  "devDependencies": {
-  },
   "dependencies": {
     "@loro-explore/shared": "workspace:^",
-    "loro-crdt": "1.0.0-alpha.3",
-    "throttle-debounce": "^5.0.2",
-    "cytoscape": "^3.30.2"
+    "cytoscape": "^3.30.2",
+    "throttle-debounce": "^5.0.2"
   }
 }

@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      loro-crdt:
+        specifier: ^1.0.7
+        version: 1.0.7
     devDependencies:
       '@builder.io/qwik':
         specifier: ^1.9.0
@@ -83,9 +87,6 @@ importers:
       cytoscape:
         specifier: ^3.30.2
         version: 3.30.2
-      loro-crdt:
-        specifier: 1.0.0-alpha.3
-        version: 1.0.0-alpha.3
       throttle-debounce:
         specifier: ^5.0.2
         version: 5.0.2
@@ -97,9 +98,6 @@ importers:
       '@loro-explore/shared':
         specifier: workspace:^
         version: link:../shared
-      loro-crdt:
-        specifier: 1.0.0-alpha.3
-        version: 1.0.0-alpha.3
       throttle-debounce:
         specifier: ^5.0.2
         version: 5.0.2
@@ -1484,11 +1482,11 @@ packages:
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
 
-  loro-crdt@1.0.0-alpha.3:
-    resolution: {integrity: sha512-CO3YcxZ0Yxd5QG/8YQpOuwACnf58heBswM3ADhIN4XgiP0lgrvKb9D8nwhZdmwhfKQIfxQ7SobDRajONlKlSaw==}
+  loro-crdt@1.0.7:
+    resolution: {integrity: sha512-BD9qx3dQdqhEegOTEYdYo2GvRoYAeZFAfwcJLDtNRKo20y/1dUsRmzAvtLzZI/cdcRg+DkpBBLr+wcL4jRYUNw==}
 
-  loro-wasm@1.0.0-alpha.3:
-    resolution: {integrity: sha512-heKDoD9Gu43YRGIWudRGTeISpE8FKM81z9/eAitvJFN1beh9GL2+3iPzr1TzuoEsUSR+Kq8VqF8aLyEPiXMesg==}
+  loro-wasm@1.0.7:
+    resolution: {integrity: sha512-WFIpGGzc6I7zRMDoRGxa3AHhno7gVnOgwqcrTfmpKWOtktZQ7BvhIV4kYgsdyuIBcMSrQEJTfOY/80xQSjUKTw==}
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
@@ -3718,11 +3716,11 @@ snapshots:
 
   longest-streak@3.1.0: {}
 
-  loro-crdt@1.0.0-alpha.3:
+  loro-crdt@1.0.7:
     dependencies:
-      loro-wasm: 1.0.0-alpha.3
+      loro-wasm: 1.0.7
 
-  loro-wasm@1.0.0-alpha.3: {}
+  loro-wasm@1.0.7: {}
 
   lru-cache@10.4.3: {}
 
