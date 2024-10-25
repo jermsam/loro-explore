@@ -16,29 +16,13 @@ import {
   HugeiconsWifiDisconnected02,
 } from '@loro-explore/shared/icons';
 import {nodes as initialNodes, edges as initialEdges} from '~/utils/nodes-edges';
-
-import {EdgeDefinition, NodeDefinition} from 'cytoscape';
 import {DarkModeContext} from '~/routes/layout';
 import {LightDarkMode, Slider, Switch} from '@loro-explore/shared/components';
-import CytoscapeComponent from '~/components/cytoscape-component';
+import CytoscapeComponent, {type Node, type Edge} from '~/components/cytoscape-component';
 import {sayHi} from '@loro-explore/shared/utils';
 
 // Create a JSON structure of
 export const initOriginDoc = server$(() => {
-  
-  // const node = {
-  //   position: {x: 0, y: 9},
-  //   data: {id: '1', label: 'A'},
-  // }
-  //
-  // const edge =  {
-  //   data: {id: 'e1-2', source: '1', target: '2'},
-  // }
-  // const elements = {
-  //   nodes: [],
-  //   edges: []
-  // }
-  
   const originDoc = new LoroDoc();
   originDoc.setPeerId(0n);
   const loroNodes = originDoc.getList('nodes');
@@ -74,10 +58,10 @@ export const initOriginDoc = server$(() => {
   return originDoc;
 });
 
-export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: NoSerialize<LoroList>, edges: NoSerialize<EdgeDefinition[]>) => {
+export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: LoroList, edges: Edge[]) => {
   if (!loroEdges || loroEdges.length === edges?.length) return;
   let changed = false;
-  const curEdges: EdgeDefinition[] = loroEdges.toJSON();
+  const curEdges: Edge[] = loroEdges.toJSON();
   let del = 0;
   for (let i = 0; i < curEdges.length; i++) {
     const edge = curEdges[i];
@@ -106,7 +90,7 @@ export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: NoS
   }
 });
 
-export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: NoSerialize<LoroList>, nodes: NoSerialize<NodeDefinition[]>) => {
+export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: LoroList, nodes: Node[]) => {
   if (!loroNodes) return;
   const n = loroNodes.length;
   
@@ -128,7 +112,7 @@ export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: NoS
       continue;
     }
     
-    const value: NodeDefinition = map.toJSON();
+    const value: Node = map.toJSON();
     const posId = map.get('position');
     const pos = doc?.getMap(posId as ContainerID);
     const valueX = value.position?.x || 0;
@@ -149,14 +133,12 @@ export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: NoS
 
 export interface LoroCytoscape {
   doc: NoSerialize<LoroDoc>;
-  nodes: NodeDefinition[];
-  edges: EdgeDefinition[];
 }
 
 
 const Flow = component$<LoroCytoscape>((props) => {
   
-  const doc = useSignal<NoSerialize<LoroDoc>>(props.doc);
+  const doc = useSignal<NoSerialize<LoroDoc>>(noSerialize(props.doc));
   const v = useSignal<number>(0);
   const maxV = useSignal<number>(0);
   // version vectors
@@ -164,31 +146,19 @@ const Flow = component$<LoroCytoscape>((props) => {
   // valid frontiers
   const vf = useSignal<OpId[][]>([]);
   
-  const nodes = useSignal<NoSerialize<NodeDefinition[]>>(noSerialize([]));
-  const edges = useSignal<NoSerialize<EdgeDefinition[]>>(noSerialize([]));
-  
-  useOnDocument('DOMContentLoaded', $(() => {
-    nodes.value = noSerialize(initialNodes);
-    edges.value = noSerialize(initialEdges);
-  }));
-  
-  useTask$(() => {
+  const nodes = useSignal<Node[]>(initialNodes);
+  const edges = useSignal<Edge[]>(initialEdges);
+ 
+  useTask$(({track, cleanup}) => {
+    track(() => doc.value);
     if (!doc.value) return;
     vv.value = JSON.stringify(Object.fromEntries(doc.value.version().toJSON()));
     if (vf.value.length === 0) {
       const opIds = doc.value.frontiers() as OpId[];
       vf.value.push(opIds);
     }
-  });
-  
-  
-  useTask$(({track, cleanup}) => {
-    track(() => doc.value);
-    if (!doc.value) return;
-    const docNodes = doc.value.getList('nodes').toJSON();
-    nodes.value = noSerialize(docNodes);
-    const docEdges = doc.value.getList('edges').toJSON();
-    edges.value = noSerialize(docEdges);
+    nodes.value = doc.value.getList('nodes').toJSON();
+    edges.value = doc.value.getList('edges').toJSON();
     const lastVV: Map<`${number}`, number> = doc.value.version().toJSON();
     
     doc.value.subscribe(e => {
@@ -215,8 +185,8 @@ const Flow = component$<LoroCytoscape>((props) => {
         }
         
         if (e.by === 'local') {
-          nodes.value = noSerialize(doc.value.getList('nodes').toJSON());
-          edges.value = noSerialize(doc.value.getList('edges').toJSON());
+          nodes.value = doc.value.getList('nodes').toJSON();
+          edges.value = doc.value.getList('edges').toJSON();
           if (changed) {
             maxV.value = vf.value.length;
             v.value = vf.value.length;
@@ -230,6 +200,7 @@ const Flow = component$<LoroCytoscape>((props) => {
     });
   });
   
+  
   const eq = useComputed$(() => maxV.value == v.value);
   
   useTask$(async ({track}) => {
@@ -237,7 +208,7 @@ const Flow = component$<LoroCytoscape>((props) => {
     track(() => eq.value);
     track(() => nodes.value);
     if (!doc.value || !eq.value) return;
-    const nodeList = noSerialize(doc.value.getList('nodes') as LoroList<unknown>);
+    const nodeList = doc.value.getList('nodes') as LoroList<unknown>;
     await onNodesUpdated(doc.value, nodeList, nodes.value);
     maxV.value = vf.value.length;
     v.value = vf.value.length;
@@ -248,7 +219,7 @@ const Flow = component$<LoroCytoscape>((props) => {
     track(() => eq.value);
     track(() => edges.value);
     if (!doc.value || !eq.value) return;
-    const edgeList = noSerialize(doc.value.getList('edges') as LoroList<unknown>);
+    const edgeList = doc.value.getList('edges') as LoroList<unknown>;
     await onEdgesUpdated(doc.value, edgeList, edges.value);
     maxV.value = vf.value.length;
     v.value = vf.value.length;
@@ -256,25 +227,25 @@ const Flow = component$<LoroCytoscape>((props) => {
   
   const onChangeVersion = $((version: number[]) => {
     if (!doc.value) return;
-    const loroNodes = doc.value.getList('nodes') as LoroList<NodeDefinition[]>;
-    const loroEdges = doc.value.getList('edges') as LoroList<EdgeDefinition[]>;
+    const loroNodes = doc.value.getList('nodes') as LoroList<Node[]>;
+    const loroEdges = doc.value.getList('edges') as LoroList<Edge[]>;
     const ver = Math.max(version[0], 1) - 1;
     if (ver == vf.value.length - 1) {
       doc.value.checkoutToLatest();
     } else {
       doc.value.checkout(vf.value[ver]);
     }
-    nodes.value = noSerialize(loroNodes.toJSON());
-    edges.value = noSerialize(loroEdges.toJSON());
+    nodes.value = loroNodes.toJSON();
+    edges.value = loroEdges.toJSON();
     v.value = version[0];
   });
   
   
-  const onNodesChange = $((ns: NodeDefinition[]) => {
-    nodes.value = noSerialize(ns);
+  const onNodesChange = $((ns: Node[]) => {
+    nodes.value = ns;
   });
-  const onEdgeChange = $((es: EdgeDefinition[]) => {
-    edges.value = noSerialize(es);
+  const onEdgeChange = $((es: Edge[]) => {
+    edges.value = es;
   });
   
   return (
@@ -428,12 +399,12 @@ export default component$(() => {
             }}
                  class={'w-[50%] border bg-white dark:bg-[#181818] border-gray-300 rounded-lg shadow-md'}
             >
-              <Flow doc={docA.value} nodes={initialNodes} edges={initialEdges}/>
+              <Flow doc={docA.value}/>
             </div>
             <div style={{flexGrow: 1}}
                  class={'w-[50%] border bg-white dark:bg-[#181818] border-gray-300 rounded-lg shadow-md'}
             >
-              <Flow doc={docB.value} nodes={initialNodes} edges={initialEdges}/>
+              <Flow doc={docB.value}/>
             </div>
           </div>
         </div>

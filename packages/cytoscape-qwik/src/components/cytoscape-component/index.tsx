@@ -1,13 +1,12 @@
 import {
   $,
   component$,
-  NoSerialize,
   QRL,
   useOn,
   useOnDocument,
   useSignal,
 } from '@builder.io/qwik';
-import cytoscape, { type EdgeDefinition, type ElementsDefinition, type NodeDefinition} from 'cytoscape';
+import cytoscape, {type EdgeDefinition, type ElementsDefinition, type NodeDefinition} from 'cytoscape';
 import {getEffectiveBackgroundColor, isDarkColor} from '@loro-explore/shared/utils';
 
 
@@ -18,12 +17,15 @@ export interface FitViewportOptions {
   maxZoom?: number;   // Maximum zoom level
 }
 
+export type Node = Pick<NodeDefinition, 'position' | 'data'>
+export type Edge = Pick<EdgeDefinition,  'data'>
+
 export interface CytoscapeComponent {
-  nodes: NoSerialize<NodeDefinition[]>;
-  edges: NoSerialize<EdgeDefinition[]>;
+  nodes: Node[];
+  edges: Edge[];
   className?: string;
-  onNodesChange$?: QRL<(nodes: NodeDefinition[]) => void>;
-  onEdgesChange$?: QRL<(edges: EdgeDefinition[]) => void>;
+  onNodesChange$?: QRL<(nodes: Node[]) => void>;
+  onEdgesChange$?: QRL<(edges: Edge[]) => void>;
   onConnect$?: QRL<(params: any) => void>;
   fitViewOptions?: FitViewportOptions;
   fitView?: boolean;
@@ -128,25 +130,34 @@ const initCytoscape = $((canvas: HTMLDivElement, elements: ElementsDefinition) =
   });
 });
 
-export default component$<CytoscapeComponent>((props) => {
+export default component$<CytoscapeComponent>(({
+                                                 nodes: nodeProps,
+                                                 edges: edgeProps,
+                                                 fitViewOptions,
+                                                 className,
+                                                 onNodesChange$,
+                                                 onEdgesChange$,
+                                                 onConnect$,
+                                               }) => {
   const canvas = useContainerElementHook();
-  
+  const nodes = useSignal<Node[]>(nodeProps);
+  const edges = useSignal<Edge[]>(edgeProps);
   useOnDocument('DOMContentLoaded', $(async () => {
     if (!canvas.value) return;
-    const newElements: ElementsDefinition = {
-      nodes: props.nodes || [],
-      edges: props.edges || [],
+    const newElements = {
+      nodes: nodes.value,
+      edges: edges.value,
     };
     const cy = await initCytoscape(canvas.value, newElements);
     // fit in space
-    cy.fit(undefined, props.fitViewOptions?.padding || 0.4);
+    cy.fit(undefined, fitViewOptions?.padding || 0.4);
     // Handle nodes
     cy.on('dragfree', 'node', () => {
       const nodes = cy.nodes().map((node) => ({
         data: node.data(),
         position: node.position(),
       }));
-      props.onNodesChange$ && props.onNodesChange$(nodes);
+      onNodesChange$ && onNodesChange$(nodes);
     });
     
     // Handle edges
@@ -154,7 +165,7 @@ export default component$<CytoscapeComponent>((props) => {
       const edges = cy?.edges().map((edge) => ({
         data: edge.data(),
       }));
-      props.onEdgesChange$ && props.onEdgesChange$(edges);
+      onEdgesChange$ && onEdgesChange$(edges);
     });
     
     // Handle connections
@@ -165,7 +176,7 @@ export default component$<CytoscapeComponent>((props) => {
         cy.on('tap', 'node', (targetEvent) => {
           const targetNode = targetEvent.target;
           const params = {source: sourceNode.id(), target: targetNode.id()};
-          props.onConnect$ && props.onConnect$(params);
+          onConnect$ && onConnect$(params);
         });
       }
     });
@@ -173,7 +184,7 @@ export default component$<CytoscapeComponent>((props) => {
   
   
   return (
-    <div class={`w-full h-full bg-dotted-grid ${props.className || ''}`} ref={canvas}/>
+    <div class={`w-full h-full bg-dotted-grid ${className || ''}`} ref={canvas}/>
   );
 });
 
