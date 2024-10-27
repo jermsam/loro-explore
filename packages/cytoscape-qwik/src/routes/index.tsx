@@ -23,38 +23,38 @@ import {sayHi} from '@loro-explore/shared/utils';
 
 // Create a JSON structure of
 
-  const originDoc = new LoroDoc();
-  originDoc.setPeerId(0n);
-  const loroNodes = originDoc.getList('nodes');
-  const loroEdges = originDoc.getList('edges');
-  for (let i = 0; i < initialNodes.length; i++) {
-    const nodeItem = initialNodes[i];
-    const node = loroNodes.insertContainer(i, new LoroMap());
-    const pos = node.setContainer('position', new LoroMap());
-    const x = nodeItem.position?.x || 0;
-    const y = nodeItem.position?.y || 0;
-    pos.set('x', x);
-    pos.set('y', y);
-    const data = node.setContainer('data', new LoroMap());
-    const id = nodeItem.data.id;
-    const label = nodeItem.data.label;
-    data.set('id', id);
-    data.set('label', label);
-  }
-  
-  for (let i = 0; i < initialEdges.length; i++) {
-    const edgeItem = initialEdges[i];
-    const edge = loroEdges.insertContainer(i, new LoroMap());
-    const data = edge.setContainer('data', new LoroMap());
-    const id = edgeItem.data.id;
-    const source = edgeItem.data.source;
-    const target = edgeItem.data.target;
-    data.set('id', id);
-    data.set('source', source);
-    data.set('target', target);
-  }
-  
-  originDoc.commit();
+const originDoc = new LoroDoc();
+originDoc.setPeerId(0n);
+const loroNodes = originDoc.getList('nodes');
+const loroEdges = originDoc.getList('edges');
+for (let i = 0; i < initialNodes.length; i++) {
+  const nodeItem = initialNodes[i];
+  const node = loroNodes.insertContainer(i, new LoroMap());
+  const pos = node.setContainer('position', new LoroMap());
+  const x = nodeItem.position?.x || 0;
+  const y = nodeItem.position?.y || 0;
+  pos.set('x', x);
+  pos.set('y', y);
+  const data = node.setContainer('data', new LoroMap());
+  const id = nodeItem.data.id;
+  const label = nodeItem.data.label;
+  data.set('id', id);
+  data.set('label', label);
+}
+
+for (let i = 0; i < initialEdges.length; i++) {
+  const edgeItem = initialEdges[i];
+  const edge = loroEdges.insertContainer(i, new LoroMap());
+  const data = edge.setContainer('data', new LoroMap());
+  const id = edgeItem.data.id;
+  const source = edgeItem.data.source;
+  const target = edgeItem.data.target;
+  data.set('id', id);
+  data.set('source', source);
+  data.set('target', target);
+}
+
+originDoc.commit();
 
 
 export const onEdgesUpdated = (doc: NoSerialize<LoroDoc>, loroEdges: LoroList, edges: Edge[]) => {
@@ -147,7 +147,7 @@ const Flow = component$<LoroCytoscape>((props) => {
   
   const nodes = useSignal<Node[]>(initialNodes);
   const edges = useSignal<Edge[]>(initialEdges);
- 
+  
   useTask$(({track, cleanup}) => {
     track(() => doc.value);
     if (!doc.value) return;
@@ -248,8 +248,7 @@ const Flow = component$<LoroCytoscape>((props) => {
   });
   
   return (
-    <div class={'w-full h-full'}
-         style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column'}}>
+    <div class={'w-full h-full relative flex flex-col'}>
       <div style={{
         position: 'absolute',
         fontSize: 18,
@@ -303,7 +302,7 @@ export default component$(() => {
   }));
   
   // Initialize Loro instances and subscriptions
-  useTask$(async () => {
+  useTask$(() => {
     const instanceA = new LoroDoc();
     const instanceB = new LoroDoc();
     instanceA.setPeerId(1n);
