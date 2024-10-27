@@ -7,7 +7,7 @@ import {
   useSignal,
   useTask$,
 } from '@builder.io/qwik';
-import {DocumentHead, server$} from '@builder.io/qwik-city';
+import {DocumentHead} from '@builder.io/qwik-city';
 import {GreetLayout} from '@loro-explore/shared/layouts';
 import {ContainerID, LoroDoc, LoroList, LoroMap, OpId, VersionVector} from 'loro-crdt';
 import {
@@ -22,7 +22,7 @@ import CytoscapeComponent, {type Node, type Edge} from '~/components/cytoscape-c
 import {sayHi} from '@loro-explore/shared/utils';
 
 // Create a JSON structure of
-export const initOriginDoc = server$(() => {
+
   const originDoc = new LoroDoc();
   originDoc.setPeerId(0n);
   const loroNodes = originDoc.getList('nodes');
@@ -55,10 +55,9 @@ export const initOriginDoc = server$(() => {
   }
   
   originDoc.commit();
-  return originDoc;
-});
 
-export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: LoroList, edges: Edge[]) => {
+
+export const onEdgesUpdated = (doc: NoSerialize<LoroDoc>, loroEdges: LoroList, edges: Edge[]) => {
   if (!loroEdges || loroEdges.length === edges?.length) return;
   let changed = false;
   const curEdges: Edge[] = loroEdges.toJSON();
@@ -88,9 +87,9 @@ export const onEdgesUpdated = server$((doc: NoSerialize<LoroDoc>, loroEdges: Lor
   if (changed) {
     doc?.commit();
   }
-});
+};
 
-export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: LoroList, nodes: Node[]) => {
+export const onNodesUpdated = (doc: NoSerialize<LoroDoc>, loroNodes: LoroList, nodes: Node[]) => {
   if (!loroNodes) return;
   const n = loroNodes.length;
   
@@ -129,7 +128,7 @@ export const onNodesUpdated = server$((doc: NoSerialize<LoroDoc>, loroNodes: Lor
   if (changed) {
     doc?.commit();
   }
-});
+};
 
 export interface LoroCytoscape {
   doc: NoSerialize<LoroDoc>;
@@ -203,24 +202,24 @@ const Flow = component$<LoroCytoscape>((props) => {
   
   const eq = useComputed$(() => maxV.value == v.value);
   
-  useTask$(async ({track}) => {
+  useTask$(({track}) => {
     track(() => doc.value);
     track(() => eq.value);
     track(() => nodes.value);
     if (!doc.value || !eq.value) return;
     const nodeList = doc.value.getList('nodes') as LoroList<unknown>;
-    await onNodesUpdated(doc.value, nodeList, nodes.value);
+    onNodesUpdated(doc.value, nodeList, nodes.value);
     maxV.value = vf.value.length;
     v.value = vf.value.length;
   });
   
-  useTask$(async ({track}) => {
+  useTask$(({track}) => {
     track(() => doc.value);
     track(() => eq.value);
     track(() => edges.value);
     if (!doc.value || !eq.value) return;
     const edgeList = doc.value.getList('edges') as LoroList<unknown>;
-    await onEdgesUpdated(doc.value, edgeList, edges.value);
+    onEdgesUpdated(doc.value, edgeList, edges.value);
     maxV.value = vf.value.length;
     v.value = vf.value.length;
   });
@@ -309,7 +308,6 @@ export default component$(() => {
     const instanceB = new LoroDoc();
     instanceA.setPeerId(1n);
     instanceB.setPeerId(2n);
-    const originDoc = await initOriginDoc();
     // Import the origin doc snapshot
     const shallowSnapshotBytes = originDoc.export({
       mode: 'shallow-snapshot',
