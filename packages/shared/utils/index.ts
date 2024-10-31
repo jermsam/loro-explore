@@ -30,9 +30,9 @@ export const isDarkColor = (color: string) => {
 };
 
 export function getEffectiveBackgroundColor(element: HTMLElement) {
-  if (!element) return '';
+  if (!(element instanceof Element)) return '';
   let bgColor = '';
-  while (element && bgColor === '' || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)') {
+  while (element && (bgColor === '' || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)')) {
     bgColor = window.getComputedStyle(element).backgroundColor;
     element = element.parentElement as HTMLElement;
   }
