@@ -1,31 +1,33 @@
 import {
-  $,
   component$,
-  QRL,
-  useOn,
-  useOnDocument,
   useSignal,
+  useTask$,
+  $, NoSerialize, noSerialize, useOn, useOnDocument, QRL,
 } from '@builder.io/qwik';
-import cytoscape, {type EdgeDefinition, type ElementsDefinition, type NodeDefinition} from 'cytoscape';
+import cytoscape, {Core, CytoscapeOptions, EdgeDefinition, NodeDefinition} from 'cytoscape';
+import  diff  from 'deep-diff';
+import get from 'lodash/get';
+import forEach from 'lodash/forEach';
+import { toJson } from './json';
+import { patch } from './patch';
+import clsx from 'clsx';
 import {getEffectiveBackgroundColor, isDarkColor} from '@loro-explore/shared/utils';
-export interface FitViewportOptions {
-  padding?: number;   // Padding around the viewport
-  zoom?: number;      // Optional zoom level
-  minZoom?: number;   // Minimum zoom level
-  maxZoom?: number;   // Maximum zoom level
-}
+import {isServer} from '@builder.io/qwik/build';
+
 export type Node = Pick<NodeDefinition, 'position' | 'data'>
 export type Edge = Pick<EdgeDefinition,  'data'>
-export interface CytoscapeComponent {
-  nodes: Node[];
-  edges: Edge[];
-  className?: string;
-  onNodesChange$?: QRL<(nodes: Node[]) => void>;
-  onEdgesChange$?: QRL<(edges: Edge[]) => void>;
-  onConnect$?: QRL<(params: any) => void>;
-  fitViewOptions?: FitViewportOptions;
-  fitView?: boolean;
+
+/**
+ * The `CytoscapeComponent` is a Qwik component that allows for the declarative creation
+ * and modification of a Cytoscape instance, a graph visualization.
+ */
+
+export interface CytoscapeComponentOptions {
+  cytoscapeOptions: NoSerialize<CytoscapeOptions>;
+  onCytoscapeChanges$?: QRL<(cy: Core) => void>;
+  class?: string;
 }
+
 export function useContainerElementHook() {
   const canvas = useSignal<HTMLDivElement>();
   const zoomLevel = useSignal<number>(1); // Start at 100% zoom
@@ -74,109 +76,60 @@ export function useContainerElementHook() {
   
   return canvas;
 }
-const initCytoscape = $((canvas: HTMLDivElement, elements: ElementsDefinition) => {
-  return cytoscape({
-    container: canvas,
-    elements: elements,
-    style: [
-      {
-        selector: 'node',
-        style: {
-          'background-color': '#a2b2c3',
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'width': '80px',
-          'height': '40px',
-          'border-width': 2,
-          'border-color': '#a2b2c3',
-          'color': '#fff',
-          'font-size': '12px',
-        },
-      },
-      {
-        selector: 'edge',
-        style: {
-          'curve-style': 'unbundled-bezier', // Smooth, self-adjusting curves
-          'control-point-distance': 40, // Adjust for a better curve
-          'control-point-weight': 0.5, // Center the curve
-          'width': 2,
-          'line-color': '#a2b2c3',
-        },
-      },
-      {
-        selector: '.port',
-        style: {
-          'background-color': '#333',
-          width: '10px',
-          height: '10px',
-          shape: 'ellipse',
-          'border-width': 0,
-        },
-      },
-    ],
-    layout: {
-      name: 'grid',
-      fit: true,
-      animate: true,
-    },
-    userZoomingEnabled: true,
-    userPanningEnabled: true,
-  });
-});
-export default component$<CytoscapeComponent>(({
-                                                 nodes: nodeProps,
-                                                 edges: edgeProps,
-                                                 fitViewOptions,
-                                                 className,
-                                                 onNodesChange$,
-                                                 onEdgesChange$,
-                                                 onConnect$,
-                                               }) => {
-  const canvas = useContainerElementHook();
 
-  useOnDocument('DOMContentLoaded', $(async () => {
-    if (!canvas.value) return;
-    const newElements = {
-      nodes: nodeProps,
-      edges: edgeProps,
+const updateCytoscape = async ( cy: any, prevProps: any, newProps: any) => {
+    if (!cy) return;
+    patch(cy, prevProps, newProps, diff, toJson, get, forEach);
+  };
+
+
+
+export default component$<CytoscapeComponentOptions>((props) => {
+  const containerRef = useContainerElementHook();
+  const cySignal = useSignal<NoSerialize<Core>>();
+  const prevPropsSignal = useSignal<NoSerialize<CytoscapeOptions>>();
+  
+
+  // Initialize Cytoscape instance when the component becomes visible on the client
+  useTask$(async ({track}) => {
+    track(()=>props.cytoscapeOptions)
+    if(isServer) return
+    const container = containerRef.value;
+    if (!container) return;
+    
+    const cy = cytoscape({
+      container,
+      ...props.cytoscapeOptions, // Spread all Cytoscape options from props
+    });
+    
+    cySignal.value = noSerialize(cy);
+    await updateCytoscape(cySignal.value, null, props.cytoscapeOptions);
+    
+    // Call the cy callback with the Cytoscape instance
+    if (props.onCytoscapeChanges$) {
+      await props.onCytoscapeChanges$(cy);
+    }
+    
+    return () => {
+      cy.destroy();
     };
-    const cy = await initCytoscape(canvas.value, newElements);
-    // fit in space
-    cy.fit(undefined, fitViewOptions?.padding || 0.4);
-    // Handle nodes
-    cy.on('dragfree', 'node', () => {
-      const nodes = cy.nodes().map((node) => ({
-        data: node.data(),
-        position: node.position(),
-      }));
-      onNodesChange$ && onNodesChange$(nodes);
+  });
+  
+  // Update Cytoscape instance when props change
+  useTask$(async ({ track }) => {
+    const cy = cySignal.value;
+    if (!cy) return;
+    
+    // Track all props
+    Object.keys(props).forEach((key) => {
+      track(() => props.cytoscapeOptions?.[key as keyof CytoscapeOptions]);
     });
     
-    // Handle edges
-    cy.on('add', 'edge', () => {
-      const edges = cy?.edges().map((edge) => ({
-        data: edge.data(),
-      }));
-      onEdgesChange$ && onEdgesChange$(edges);
-    });
-    
-    // Handle connections
-    
-    cy.on('tap', 'node', (event) => {
-      const sourceNode = event.target;
-      if (sourceNode) {
-        cy.on('tap', 'node', (targetEvent) => {
-          const targetNode = targetEvent.target;
-          const params = {source: sourceNode.id(), target: targetNode.id()};
-          onConnect$ && onConnect$(params);
-        });
-      }
-    });
-  }));
+    await updateCytoscape(cy, prevPropsSignal.value, props.cytoscapeOptions);
+    prevPropsSignal.value = props.cytoscapeOptions;
+  });
   
   
-  return (
-      <div class={`w-full h-full bg-dotted-grid ${className || ''}`} ref={canvas}/>
-  );
+  
+  return <div ref={containerRef} class={clsx('w-full h-full bg-dotted-grid ', props.class)}  ></div>;
 });
