@@ -15,7 +15,7 @@ import {
   HugeiconsWifiConnected02,
   HugeiconsWifiDisconnected02,
 } from '@loro-explore/shared/icons';
-import {nodes as initialNodes, edges as initialEdges} from '../nodes-edges';
+import {nodes as initialNodes, edges as initialEdges, stylesheets} from '../nodes-edges';
 import {LightDarkMode, Slider, Switch} from '@loro-explore/shared/components';
 import {ContainerID, LoroDoc, LoroList, LoroMap, OpId} from 'loro-crdt';
 import CytoscapeComponent, {Node, Edge} from '~/components/cytoscape-component';
@@ -47,52 +47,18 @@ const FlowComponent = component$<FlowComponentProps>(({doc, nodes: initNodes, ed
         nodes: nodes.value,
         edges: edges.value,
       },
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': '#a2b2c3',
-            'label': 'data(label)',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'width': '80px',
-            'height': '40px',
-            'border-width': 2,
-            'border-color': '#a2b2c3',
-            'color': '#fff',
-            'font-size': '12px',
-            // Add smooth transition for position
-            'transition-property': 'position',
-            'transition-duration': '0.2s', // Adjust as needed
-            'transition-timing-function': 'ease-in-out',
-          },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'curve-style': 'unbundled-bezier',
-            'control-point-distance': 40,
-            'control-point-weight': 0.5,
-            'width': 2,
-            'line-color': '#a2b2c3',
-          },
-        },
-        {
-          selector: '.port',
-          style: {
-            'background-color': '#333',
-            width: '10px',
-            height: '10px',
-            shape: 'ellipse',
-            'border-width': 0,
-          },
-        },
-      ],
+      style: stylesheets,
       layout: {
         name: 'preset', // Use preset layout to place nodes manually
       },
       userZoomingEnabled: true,
       userPanningEnabled: true,
+      hoverDelay: 150, // time spent hovering over a target node before it is considered selected
+      snap: true, // when enabled, the edge can be drawn by just moving close to a target node (can be confusing on compound graphs)
+      snapThreshold: 50, // the target node must be less than or equal to this many pixels away from the cursor/finger
+      snapFrequency: 15, // the number of times per second (Hz) that snap checks done (lower is less expensive)
+      noEdgeEventsInDraw: true, // set events:no to edges during draws, prevents mouseouts on compounds
+      disableBrowserGestures: true
     });
   });
   
